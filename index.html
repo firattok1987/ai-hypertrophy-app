@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Premium Fitness Tracker</title>
+
 <style>
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #0f0f0f;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
   color: white;
 }
 
@@ -20,48 +21,89 @@ body {
 
 h1 {
   text-align: center;
-  color: #00ffae;
+  font-weight: 600;
+}
+
+.glass {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 15px;
+  margin-top: 15px;
 }
 
 input {
-  width: 70%;
+  width: 45%;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: none;
+  margin-right: 5px;
 }
 
 button {
-  padding: 10px;
+  padding: 10px 14px;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #00ffae;
-  cursor: pointer;
   font-weight: bold;
+  cursor: pointer;
 }
 
 .workout {
-  background: #1e1e1e;
-  padding: 12px;
-  margin-top: 10px;
-  border-radius: 10px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 10px;
+  animation: fadeIn 0.3s ease;
+}
+
+.progress-container {
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  height: 15px;
+  margin-top: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #00ffae;
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {opacity: 0; transform: translateY(5px);}
+  to {opacity: 1; transform: translateY(0);}
 }
 </style>
 </head>
+
 <body>
 
 <div class="container">
   <h1>Premium Fitness</h1>
-  
-  <input id="workoutInput" placeholder="Egzersiz ekle...">
-  <button onclick="addWorkout()">Ekle</button>
+
+  <div class="glass">
+    <input id="workoutInput" placeholder="Egzersiz">
+    <input id="calorieInput" type="number" placeholder="Kalori">
+    <button onclick="addWorkout()">Ekle</button>
+  </div>
+
+  <div class="glass">
+    <h3>Günlük Toplam: <span id="totalCalories">0</span> kcal</h3>
+    <div class="progress-container">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+  </div>
 
   <div id="workoutList"></div>
 </div>
 
 <script>
+const calorieGoal = 500;
 let workouts = JSON.parse(localStorage.getItem("workouts")) || [];
 
 function save() {
@@ -70,24 +112,39 @@ function save() {
 
 function render() {
   const list = document.getElementById("workoutList");
+  const totalSpan = document.getElementById("totalCalories");
+  const progressBar = document.getElementById("progressBar");
+
   list.innerHTML = "";
-  
-  workouts.forEach((workout, index) => {
+  let total = 0;
+
+  workouts.forEach((item, index) => {
+    total += item.calories;
+
     const div = document.createElement("div");
     div.className = "workout";
     div.innerHTML = `
-      ${workout}
+      <span>${item.name} - ${item.calories} kcal</span>
       <button onclick="deleteWorkout(${index})">X</button>
     `;
     list.appendChild(div);
   });
+
+  totalSpan.textContent = total;
+  const percent = Math.min((total / calorieGoal) * 100, 100);
+  progressBar.style.width = percent + "%";
 }
 
 function addWorkout() {
-  const input = document.getElementById("workoutInput");
-  if (input.value.trim() === "") return;
-  workouts.push(input.value);
-  input.value = "";
+  const name = document.getElementById("workoutInput").value;
+  const calories = parseInt(document.getElementById("calorieInput").value);
+
+  if (!name || !calories) return;
+
+  workouts.push({ name, calories });
+  document.getElementById("workoutInput").value = "";
+  document.getElementById("calorieInput").value = "";
+
   save();
   render();
 }
