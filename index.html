@@ -1,180 +1,141 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Adaptive Training Engine</title>
+  <meta charset="UTF-8">
+  <title>Workout Tracker Pro</title>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs } 
+    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "API_KEY",
+      authDomain: "PROJECT.firebaseapp.com",
+      projectId: "PROJECT_ID",
+      storageBucket: "PROJECT.appspot.com",
+      messagingSenderId: "XXXX",
+      appId: "XXXX"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function saveToFirebase(data) {
+      await addDoc(collection(db, "workouts"), data);
+    }
+
+    window.saveWorkout = async function () {
+      const week = parseInt(document.getElementById("week").value);
+      const day = document.getElementById("day").value;
+      const bw = parseFloat(document.getElementById("bw").value);
+      const weight = parseFloat(document.getElementById("weight").value);
+      const reps = parseInt(document.getElementById("reps").value);
+      const rir = parseInt(document.getElementById("rir").value);
+
+      const volume = weight * reps;
+
+      await saveToFirebase({ week, day, bw, weight, reps, rir, volume, date: new Date() });
+      alert("Saved!");
+      loadData();
+    };
+
+    window.handleFile = async function (e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = async function (event) {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+
+        for (let row of rows) {
+          const volume = row.weight * row.reps;
+
+          await saveToFirebase({
+            week: row.week,
+            day: row.day,
+            bw: row.bw,
+            weight: row.weight,
+            reps: row.reps,
+            rir: row.rir,
+            volume,
+            date: new Date()
+          });
+        }
+
+        alert("Excel Imported!");
+        loadData();
+      };
+
+      reader.readAsArrayBuffer(file);
+    };
+
+    window.loadData = async function () {
+      const snapshot = await getDocs(collection(db, "workouts"));
+      let volumes = {};
+      let max = 0;
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (!volumes[data.week]) volumes[data.week] = 0;
+        volumes[data.week] += data.volume;
+        if (data.weight > max) max = data.weight;
+      });
+
+      document.getElementById("pr").innerText = max + " kg";
+      renderChart(volumes);
+    };
+
+    function renderChart(volumes) {
+      const ctx = document.getElementById('chart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: Object.keys(volumes),
+          datasets: [{
+            label: 'Weekly Volume',
+            data: Object.values(volumes)
+          }]
+        }
+      });
+    }
+
+    window.onload = loadData;
+  </script>
 </head>
-<body class="bg-gray-950 text-white min-h-screen p-6">
 
-<div class="max-w-6xl mx-auto space-y-6">
+<body>
+  <h1>Workout Tracker Pro</h1>
 
-<h1 class="text-3xl font-bold">Adaptive Training Engine</h1>
+  <h3>Manual Entry</h3>
+  Week: <input type="number" id="week"><br>
+  Day:
+  <select id="day">
+    <option>Push A</option>
+    <option>Pull A</option>
+  </select><br>
+  BW: <input type="number" id="bw"><br>
+  Weight: <input type="number" id="weight"><br>
+  Reps: <input type="number" id="reps"><br>
+  RIR: <input type="number" id="rir"><br><br>
 
-<div class="bg-gray-900 p-4 rounded-xl space-y-4">
+  <button onclick="saveWorkout()">Save Workout</button>
 
-<div class="flex gap-4 flex-wrap">
+  <hr>
 
-<div>
-<label>Hafta</label>
-<input type="number" id="weekInput" min="1" max="12" value="1"
-class="bg-gray-800 p-2 rounded w-20">
-</div>
+  <h3>Excel Upload</h3>
+  <input type="file" accept=".xlsx,.csv" onchange="handleFile(event)">
 
-<div>
-<label>Hareket</label>
-<input type="text" id="exerciseInput"
-class="bg-gray-800 p-2 rounded">
-</div>
+  <hr>
 
-<div>
-<label>Kaldırılan Ağırlık (kg)</label>
-<input type="number" id="weightInput"
-class="bg-gray-800 p-2 rounded w-24">
-</div>
-
-<div>
-<label>Tekrar</label>
-<input type="number" id="repsInput"
-class="bg-gray-800 p-2 rounded w-20">
-</div>
-
-<div>
-<label>RIR</label>
-<input type="number" id="rirInput" min="0" max="5"
-class="bg-gray-800 p-2 rounded w-20">
-</div>
-
-<button onclick="saveSession()" 
-class="bg-green-600 px-4 py-2 rounded mt-6">
-Kaydet
-</button>
-
-</div>
-</div>
-
-<div class="grid md:grid-cols-2 gap-6">
-
-<div class="bg-gray-900 p-4 rounded-xl">
-<h2 class="text-xl mb-2">Performans Trend</h2>
-<canvas id="progressChart"></canvas>
-</div>
-
-<div class="bg-gray-900 p-4 rounded-xl space-y-3">
-<h2 class="text-xl">Optimizasyon Önerisi</h2>
-<div id="recommendation"></div>
-</div>
-
-</div>
-
-</div>
-
-<script>
-
-let chart
-
-function calculate1RM(w,r){
-return w*(1+r/30)
-}
-
-function saveSession(){
-
-let week=parseInt(document.getElementById("weekInput").value)
-let exercise=document.getElementById("exerciseInput").value
-let weight=parseFloat(document.getElementById("weightInput").value)
-let reps=parseInt(document.getElementById("repsInput").value)
-let rir=parseInt(document.getElementById("rirInput").value)
-
-if(!exercise) return
-
-let history=JSON.parse(localStorage.getItem("trainingData")||"{}")
-
-if(!history[exercise]) history[exercise]=[]
-
-let entry={
-week,weight,reps,rir,
-rm:calculate1RM(weight,reps)
-}
-
-history[exercise].push(entry)
-
-localStorage.setItem("trainingData",JSON.stringify(history))
-
-optimizeNextWorkout(exercise)
-renderChart(exercise)
-}
-
-function optimizeNextWorkout(exercise){
-
-let history=JSON.parse(localStorage.getItem("trainingData")||"{}")[exercise]
-
-if(history.length<2){
-document.getElementById("recommendation").innerHTML=
-"Veri birikiyor..."
-return
-}
-
-let last=history[history.length-1]
-let prev=history[history.length-2]
-
-let suggestion=""
-
-let performanceDelta=last.rm-prev.rm
-
-if(performanceDelta>1 && last.rir<=1){
-suggestion=`Ağırlık artır: +2.5 kg önerilir`
-}
-else if(performanceDelta<=0){
-suggestion=`Performans düşüşü: Aynı kiloyla tekrar artırmayı dene`
-}
-else if(last.rir>=3){
-suggestion=`Tekrar artır: +1-2 rep`
-}
-else{
-suggestion=`Mevcut yükü koru`
-}
-
-document.getElementById("recommendation").innerHTML=`
-<div>Son 1RM: ${last.rm.toFixed(1)} kg</div>
-<div>Değişim: ${performanceDelta.toFixed(2)} kg</div>
-<div class="text-yellow-400 mt-2">${suggestion}</div>
-`
-}
-
-function renderChart(exercise){
-
-let history=JSON.parse(localStorage.getItem("trainingData")||"{}")[exercise]
-
-let labels=history.map(e=>"H"+e.week)
-let values=history.map(e=>e.rm)
-
-if(chart) chart.destroy()
-
-chart=new Chart(document.getElementById("progressChart"),{
-type:"line",
-data:{
-labels:labels,
-datasets:[{
-label:"Estimated 1RM",
-data:values,
-borderColor:"#3b82f6",
-tension:0.3
-}]
-},
-options:{
-plugins:{legend:{labels:{color:"white"}}},
-scales:{
-x:{ticks:{color:"white"}},
-y:{ticks:{color:"white"}}
-}
-}
-})
-}
-
-</script>
+  <h3>PR: <span id="pr">0 kg</span></h3>
+  <canvas id="chart"></canvas>
 
 </body>
 </html>
