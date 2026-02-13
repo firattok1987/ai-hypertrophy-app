@@ -1,161 +1,179 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Premium Fitness Tracker</title>
+<title>Adaptive Training Engine</title>
 
-<style>
-body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-  color: white;
-}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
 
-.container {
-  max-width: 500px;
-  margin: auto;
-  padding: 20px;
-}
-
-h1 {
-  text-align: center;
-  font-weight: 600;
-}
-
-.glass {
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(10px);
-  border-radius: 15px;
-  padding: 15px;
-  margin-top: 15px;
-}
-
-input {
-  width: 45%;
-  padding: 10px;
-  border-radius: 10px;
-  border: none;
-  margin-right: 5px;
-}
-
-button {
-  padding: 10px 14px;
-  border: none;
-  border-radius: 10px;
-  background: #00ffae;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.workout {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-  padding: 10px;
-  background: rgba(0,0,0,0.4);
-  border-radius: 10px;
-  animation: fadeIn 0.3s ease;
-}
-
-.progress-container {
-  background: rgba(255,255,255,0.1);
-  border-radius: 10px;
-  height: 15px;
-  margin-top: 10px;
-}
-
-.progress-bar {
-  height: 100%;
-  width: 0%;
-  background: #00ffae;
-  border-radius: 10px;
-  transition: width 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from {opacity: 0; transform: translateY(5px);}
-  to {opacity: 1; transform: translateY(0);}
-}
-</style>
 </head>
+<body class="bg-gray-950 text-white min-h-screen p-6">
 
-<body>
+<div class="max-w-6xl mx-auto space-y-6">
 
-<div class="container">
-  <h1>Premium Fitness</h1>
+<h1 class="text-3xl font-bold">Adaptive Training Engine</h1>
 
-  <div class="glass">
-    <input id="workoutInput" placeholder="Egzersiz">
-    <input id="calorieInput" type="number" placeholder="Kalori">
-    <button onclick="addWorkout()">Ekle</button>
-  </div>
+<div class="bg-gray-900 p-4 rounded-xl space-y-4">
 
-  <div class="glass">
-    <h3>Günlük Toplam: <span id="totalCalories">0</span> kcal</h3>
-    <div class="progress-container">
-      <div id="progressBar" class="progress-bar"></div>
-    </div>
-  </div>
+<div class="flex gap-4 flex-wrap">
 
-  <div id="workoutList"></div>
+<div>
+<label>Hafta</label>
+<input type="number" id="weekInput" min="1" max="12" value="1"
+class="bg-gray-800 p-2 rounded w-20">
+</div>
+
+<div>
+<label>Hareket</label>
+<input type="text" id="exerciseInput"
+class="bg-gray-800 p-2 rounded">
+</div>
+
+<div>
+<label>Kaldırılan Ağırlık (kg)</label>
+<input type="number" id="weightInput"
+class="bg-gray-800 p-2 rounded w-24">
+</div>
+
+<div>
+<label>Tekrar</label>
+<input type="number" id="repsInput"
+class="bg-gray-800 p-2 rounded w-20">
+</div>
+
+<div>
+<label>RIR</label>
+<input type="number" id="rirInput" min="0" max="5"
+class="bg-gray-800 p-2 rounded w-20">
+</div>
+
+<button onclick="saveSession()" 
+class="bg-green-600 px-4 py-2 rounded mt-6">
+Kaydet
+</button>
+
+</div>
+</div>
+
+<div class="grid md:grid-cols-2 gap-6">
+
+<div class="bg-gray-900 p-4 rounded-xl">
+<h2 class="text-xl mb-2">Performans Trend</h2>
+<canvas id="progressChart"></canvas>
+</div>
+
+<div class="bg-gray-900 p-4 rounded-xl space-y-3">
+<h2 class="text-xl">Optimizasyon Önerisi</h2>
+<div id="recommendation"></div>
+</div>
+
+</div>
+
 </div>
 
 <script>
-const calorieGoal = 500;
-let workouts = JSON.parse(localStorage.getItem("workouts")) || [];
 
-function save() {
-  localStorage.setItem("workouts", JSON.stringify(workouts));
+let chart
+
+function calculate1RM(w,r){
+return w*(1+r/30)
 }
 
-function render() {
-  const list = document.getElementById("workoutList");
-  const totalSpan = document.getElementById("totalCalories");
-  const progressBar = document.getElementById("progressBar");
+function saveSession(){
 
-  list.innerHTML = "";
-  let total = 0;
+let week=parseInt(document.getElementById("weekInput").value)
+let exercise=document.getElementById("exerciseInput").value
+let weight=parseFloat(document.getElementById("weightInput").value)
+let reps=parseInt(document.getElementById("repsInput").value)
+let rir=parseInt(document.getElementById("rirInput").value)
 
-  workouts.forEach((item, index) => {
-    total += item.calories;
+if(!exercise) return
 
-    const div = document.createElement("div");
-    div.className = "workout";
-    div.innerHTML = `
-      <span>${item.name} - ${item.calories} kcal</span>
-      <button onclick="deleteWorkout(${index})">X</button>
-    `;
-    list.appendChild(div);
-  });
+let history=JSON.parse(localStorage.getItem("trainingData")||"{}")
 
-  totalSpan.textContent = total;
-  const percent = Math.min((total / calorieGoal) * 100, 100);
-  progressBar.style.width = percent + "%";
+if(!history[exercise]) history[exercise]=[]
+
+let entry={
+week,weight,reps,rir,
+rm:calculate1RM(weight,reps)
 }
 
-function addWorkout() {
-  const name = document.getElementById("workoutInput").value;
-  const calories = parseInt(document.getElementById("calorieInput").value);
+history[exercise].push(entry)
 
-  if (!name || !calories) return;
+localStorage.setItem("trainingData",JSON.stringify(history))
 
-  workouts.push({ name, calories });
-  document.getElementById("workoutInput").value = "";
-  document.getElementById("calorieInput").value = "";
-
-  save();
-  render();
+optimizeNextWorkout(exercise)
+renderChart(exercise)
 }
 
-function deleteWorkout(index) {
-  workouts.splice(index, 1);
-  save();
-  render();
+function optimizeNextWorkout(exercise){
+
+let history=JSON.parse(localStorage.getItem("trainingData")||"{}")[exercise]
+
+if(history.length<2){
+document.getElementById("recommendation").innerHTML=
+"Veri birikiyor..."
+return
 }
 
-render();
+let last=history[history.length-1]
+let prev=history[history.length-2]
+
+let suggestion=""
+
+let performanceDelta=last.rm-prev.rm
+
+if(performanceDelta>1 && last.rir<=1){
+suggestion=`Ağırlık artır: +2.5 kg önerilir`
+}
+else if(performanceDelta<=0){
+suggestion=`Performans düşüşü: Aynı kiloyla tekrar artırmayı dene`
+}
+else if(last.rir>=3){
+suggestion=`Tekrar artır: +1-2 rep`
+}
+else{
+suggestion=`Mevcut yükü koru`
+}
+
+document.getElementById("recommendation").innerHTML=`
+<div>Son 1RM: ${last.rm.toFixed(1)} kg</div>
+<div>Değişim: ${performanceDelta.toFixed(2)} kg</div>
+<div class="text-yellow-400 mt-2">${suggestion}</div>
+`
+}
+
+function renderChart(exercise){
+
+let history=JSON.parse(localStorage.getItem("trainingData")||"{}")[exercise]
+
+let labels=history.map(e=>"H"+e.week)
+let values=history.map(e=>e.rm)
+
+if(chart) chart.destroy()
+
+chart=new Chart(document.getElementById("progressChart"),{
+type:"line",
+data:{
+labels:labels,
+datasets:[{
+label:"Estimated 1RM",
+data:values,
+borderColor:"#3b82f6",
+tension:0.3
+}]
+},
+options:{
+plugins:{legend:{labels:{color:"white"}}},
+scales:{
+x:{ticks:{color:"white"}},
+y:{ticks:{color:"white"}}
+}
+}
+})
+}
+
 </script>
 
 </body>
