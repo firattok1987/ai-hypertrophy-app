@@ -12,8 +12,7 @@ class AIHypertrophyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
+      theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F0F12),
         colorScheme: const ColorScheme.dark(
           primary: Colors.deepPurple,
@@ -27,3 +26,4 @@ class AIHypertrophyApp extends StatelessWidget {
     );
   }
 }
+
